@@ -67,7 +67,7 @@
         <button id="okBtn">OK</button>
       </div>
       <div id="err"></div>
-      <div id="hint">Press Esc any time to put a new link in</div>
+      <div id="hint">Press Ctrl+Enter any time to put a new link in</div>
     </div>
   </div>
 </div>
@@ -131,15 +131,6 @@
   document.getElementById('okBtn').addEventListener('click', go);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
 
-  // Esc = back to the link box
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      const old = box.querySelector('iframe, video');
-      if (old) old.remove();
-      prompt_.style.display = 'flex';
-      input.focus();
-    }
-  });
 
   // ===== Hide / show shortcuts =====
   // Ctrl + `  -> hides the video box so only the plain screenshot is left
