@@ -96,7 +96,7 @@
       else if (u.pathname.startsWith('/shorts/') || u.pathname.startsWith('/embed/') || u.pathname.startsWith('/live/'))
         id = u.pathname.split('/')[2];
     }
-    if (id) return { type: 'iframe', src: `https://www.youtube.com/embed/${id}?autoplay=1&rel=0` };
+    if (id) return { type: 'youtube', src: `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&enablejsapi=1` };
 
     // Direct video files
     if (/\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(u.pathname)) return { type: 'video', src: url };
@@ -114,6 +114,7 @@
     const old = box.querySelector('iframe, video');
     if (old) old.remove();
 
+    currentType = result.type;
     let el;
     if (result.type === 'video') {
       el = document.createElement('video');
@@ -138,6 +139,78 @@
       prompt_.style.display = 'flex';
       input.focus();
     }
+  });
+
+  // ===== Hide / show shortcuts =====
+  // Ctrl + `  -> hides the video box so only the plain screenshot is left
+  // Ctrl + Q  -> brings it back
+  // Ctrl + Enter -> un-embeds the link and reopens the "Insert link" page
+  // YouTube links and direct video files get properly paused/resumed.
+  // Other websites can't be paused from here (browsers don't allow it), so for those:
+  // STOP_ON_HIDE = true  -> the page is removed so sound stops (it reloads from the start when shown)
+  // STOP_ON_HIDE = false -> it keeps running quietly behind the screenshot
+  const STOP_ON_HIDE = false;
+  let hidden = false;
+  let savedEl = null;
+  let currentType = null;
+
+  function ytCommand(cmd) {
+    const f = box.querySelector('iframe');
+    if (f && f.contentWindow) {
+      f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: cmd, args: '' }), '*');
+    }
+  }
+
+  function hideSite() {
+    if (hidden) return;
+    hidden = true;
+    const vid = box.querySelector('video');
+    if (currentType === 'youtube') {
+      ytCommand('pauseVideo');
+    } else if (vid) {
+      vid.pause();
+    } else if (STOP_ON_HIDE) {
+      const el = box.querySelector('iframe');
+      if (el) { savedEl = el; el.remove(); }
+    }
+    box.style.display = 'none';
+  }
+
+  function showSite() {
+    if (!hidden) return;
+    hidden = false;
+    if (savedEl) { box.appendChild(savedEl); savedEl = null; }
+    box.style.display = '';
+    const vid = box.querySelector('video');
+    if (currentType === 'youtube') ytCommand('playVideo');
+    else if (vid) vid.play().catch(() => {});
+  }
+
+  // Ctrl + Enter -> removes the embedded link and goes back to the "Insert link" page
+  function resetSite() {
+    hidden = false;
+    savedEl = null;
+    currentType = null;
+    const old = box.querySelector('iframe, video');
+    if (old) old.remove();
+    box.style.display = '';
+    prompt_.style.display = 'flex';
+    input.value = '';
+    err.textContent = '';
+    input.focus();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.code === 'Backquote') { e.preventDefault(); hideSite(); }
+    else if (e.ctrlKey && e.code === 'KeyQ') { e.preventDefault(); showSite(); }
+    else if (e.ctrlKey && (e.key === 'Enter' || e.code === 'NumpadEnter')) { e.preventDefault(); resetSite(); }
+  }, true);
+
+  // Keys pressed while the cursor is inside the video go to the video, not the page.
+  // When the mouse leaves the video, hand the keyboard focus back to the page so the shortcuts work.
+  box.addEventListener('mouseleave', () => {
+    const a = document.activeElement;
+    if (a && a.tagName === 'IFRAME') { window.focus(); a.blur(); }
   });
 </script>
 </body>
