@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube</title>
+<style>
+  html, body { margin: 0; background: #fff; }
+
+  /* The wrapper is exactly the size of the screenshot, so every
+     overlay position below (in %) always lines up with the picture. */
+  #stage { position: relative; width: 100%; max-width: 1904px; margin: 0 auto; }
+  #stage > img { display: block; width: 100%; height: auto; }
+
+  /* === VIDEO AREA POSITION (percent of the screenshot) ===
+     Tweak these 4 numbers if it's off by a pixel or two. */
+  #videoBox {
+    position: absolute;
+    left: 1.155%;
+    top: 10.16%;
+    width: 68.33%;
+    height: 72.9%;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+  }
+  #videoBox iframe, #videoBox video {
+    width: 100%; height: 100%; border: 0; display: block; background: #000;
+  }
+
+  /* The "insert link" panel */
+  #prompt {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; background: #0f0f0f; color: #fff;
+    font-family: Roboto, Arial, sans-serif;
+  }
+  #prompt h2 { margin: 0; font-weight: 500; font-size: clamp(14px, 2vw, 26px); }
+  #prompt .row { display: flex; gap: 8px; width: 70%; }
+  #linkInput {
+    flex: 1; min-width: 0; padding: 12px 16px; border-radius: 999px;
+    border: 1px solid #444; background: #1e1e1e; color: #fff; font-size: clamp(12px, 1.3vw, 16px);
+    outline: none;
+  }
+  #linkInput:focus { border-color: #3ea6ff; }
+  #okBtn {
+    padding: 12px 26px; border: 0; border-radius: 999px; cursor: pointer;
+    background: #fff; color: #0f0f0f; font-weight: 600; font-size: clamp(12px, 1.3vw, 16px);
+  }
+  #okBtn:hover { background: #e0e0e0; }
+  #err { color: #ff6b6b; font-size: 13px; min-height: 16px; }
+  #hint { color: #888; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <img src="Screenshot%202026-11-25%20190421.png" alt="YouTube page">
+
+  <div id="videoBox">
+    <div id="prompt">
+      <h2>Insert link</h2>
+      <div class="row">
+        <input id="linkInput" type="text" placeholder="Paste a link here..." autocomplete="off">
+        <button id="okBtn">OK</button>
+      </div>
+      <div id="err"></div>
+      <div id="hint">Press Esc any time to put a new link in</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const box    = document.getElementById('videoBox');
+  const prompt_ = document.getElementById('prompt');
+  const input  = document.getElementById('linkInput');
+  const err    = document.getElementById('err');
+
+  // Turn whatever the person pasted into something embeddable
+  function buildEmbed(raw) {
+    let url = raw.trim();
+    if (!url) return null;
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+    let u;
+    try { u = new URL(url); } catch { return null; }
+    const host = u.hostname.replace(/^www\./, '');
+
+    // YouTube
+    let id = null;
+    if (host === 'youtu.be') id = u.pathname.slice(1);
+    else if (host.endsWith('youtube.com')) {
+      if (u.pathname === '/watch') id = u.searchParams.get('v');
+      else if (u.pathname.startsWith('/shorts/') || u.pathname.startsWith('/embed/') || u.pathname.startsWith('/live/'))
+        id = u.pathname.split('/')[2];
+    }
+    if (id) return { type: 'iframe', src: `https://www.youtube.com/embed/${id}?autoplay=1&rel=0` };
+
+    // Direct video files
+    if (/\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(u.pathname)) return { type: 'video', src: url };
+
+    // Anything else: try it in an iframe (some sites block this)
+    return { type: 'iframe', src: url };
+  }
+
+  function go() {
+    const result = buildEmbed(input.value);
+    if (!result) { err.textContent = "That doesn't look like a link."; return; }
+    err.textContent = '';
+    prompt_.style.display = 'none';
+
+    const old = box.querySelector('iframe, video');
+    if (old) old.remove();
+
+    let el;
+    if (result.type === 'video') {
+      el = document.createElement('video');
+      el.src = result.src; el.controls = true; el.autoplay = true;
+    } else {
+      el = document.createElement('iframe');
+      el.src = result.src;
+      el.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media';
+      el.allowFullscreen = true;
+    }
+    box.appendChild(el);
+  }
+
+  document.getElementById('okBtn').addEventListener('click', go);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+
+  // Esc = back to the link box
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      const old = box.querySelector('iframe, video');
+      if (old) old.remove();
+      prompt_.style.display = 'flex';
+      input.focus();
+    }
+  });
+</script>
+</body>
+</html>
